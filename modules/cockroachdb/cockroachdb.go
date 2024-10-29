@@ -257,23 +257,23 @@ func setRecommendedSettings(ctx context.Context, container testcontainers.Contai
 	}
 	defer db.Close()
 
-	stmts := []string{
-		"SET CLUSTER SETTING kv.range_merge.queue_interval = '50ms'",
-		"SET CLUSTER SETTING jobs.registry.interval.gc = '30s'",
-		"SET CLUSTER SETTING jobs.registry.interval.cancel = '180s'",
-		"SET CLUSTER SETTING jobs.retention_time = '15s'",
-		"SET CLUSTER SETTING sql.stats.automatic_collection.enabled = false",
-		"SET CLUSTER SETTING kv.range_split.by_load_merge_delay = '5s'",
-		`ALTER RANGE default CONFIGURE ZONE USING "gc.ttlseconds" = 600`,
-		`ALTER DATABASE system CONFIGURE ZONE USING "gc.ttlseconds" = 600`,
-	}
-
-	for _, stmt := range stmts {
-		_, err = db.Exec(stmt)
-		if err != nil {
-			return fmt.Errorf("failed to set cluster settings: %w", err)
-		}
-	}
+	// stmts := []string{
+	// 	"SET CLUSTER SETTING kv.range_merge.queue_interval = '50ms'",
+	// 	"SET CLUSTER SETTING jobs.registry.interval.gc = '30s'",
+	// 	"SET CLUSTER SETTING jobs.registry.interval.cancel = '180s'",
+	// 	"SET CLUSTER SETTING jobs.retention_time = '15s'",
+	// 	"SET CLUSTER SETTING sql.stats.automatic_collection.enabled = false",
+	// 	"SET CLUSTER SETTING kv.range_split.by_load_merge_delay = '5s'",
+	// 	`ALTER RANGE default CONFIGURE ZONE USING "gc.ttlseconds" = 600`,
+	// 	`ALTER DATABASE system CONFIGURE ZONE USING "gc.ttlseconds" = 600`,
+	// }
+	//
+	// for _, stmt := range stmts {
+	// 	_, err = db.Exec(stmt)
+	// 	if err != nil {
+	// 		return fmt.Errorf("failed to set cluster settings: %w", err)
+	// 	}
+	// }
 
 	slog.Info("cluster settings set")
 	return nil
