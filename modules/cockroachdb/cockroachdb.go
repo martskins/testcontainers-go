@@ -4,8 +4,10 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
+	"database/sql"
 	"encoding/pem"
 	"fmt"
+	"log/slog"
 	"net"
 	"net/url"
 	"path/filepath"
@@ -88,6 +90,11 @@ func Run(ctx context.Context, img string, opts ...testcontainers.ContainerCustom
 					PreStarts: []testcontainers.ContainerHook{
 						func(ctx context.Context, container testcontainers.Container) error {
 							return addTLS(ctx, container, o)
+						},
+					},
+					PostReadies: []testcontainers.ContainerHook{
+						func(ctx context.Context, container testcontainers.Container) error {
+							return addRecommendedSettigns(ctx, container, o)
 						},
 					},
 				},
@@ -230,6 +237,45 @@ func addTLS(ctx context.Context, container testcontainers.Container, opts option
 			return err
 		}
 	}
+	return nil
+}
+
+func setRecommendedSettings(ctx context.Context, container testcontainers.Container, opts options) error {
+	port, err := container.MappedPort(ctx, defaultSQLPort)
+	if err != nil {
+		return err
+	}
+
+	host, err := container.Host(ctx)
+	if err != nil {
+		return err
+	}
+
+	db, err := sql.Open("pgx/v5", connString(opts, host, port))
+	if err != nil {
+		return fmt.Errorf("failed to open connection to container: %w", err)
+	}
+	defer db.Close()
+
+	stmts := []string{
+		"SET CLUSTER SETTING kv.range_merge.queue_interval = '50ms'",
+		"SET CLUSTER SETTING jobs.registry.interval.gc = '30s'",
+		"SET CLUSTER SETTING jobs.registry.interval.cancel = '180s'",
+		"SET CLUSTER SETTING jobs.retention_time = '15s'",
+		"SET CLUSTER SETTING sql.stats.automatic_collection.enabled = false",
+		"SET CLUSTER SETTING kv.range_split.by_load_merge_delay = '5s'",
+		`ALTER RANGE default CONFIGURE ZONE USING "gc.ttlseconds" = 600`,
+		`ALTER DATABASE system CONFIGURE ZONE USING "gc.ttlseconds" = 600`,
+	}
+
+	for _, stmt := range stmts {
+		_, err = db.Exec(stmt)
+		if err != nil {
+			return fmt.Errorf("failed to set cluster settings: %w", err)
+		}
+	}
+
+	slog.Info("cluster settings set")
 	return nil
 }
 
